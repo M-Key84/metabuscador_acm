@@ -8,13 +8,13 @@ from extractor import ExtractorInmobiliario
 from motor_acm import MotorACM
 import pipeline_db
 
-st.set_page_config(page_title="Portal Metabuscador ACM Nacional", layout="centered")
+st.set_page_config(page_title="Metabuscador ACM Aburrá", layout="centered")
 
-st.title("Plataforma Inmobiliaria - Motor ACM Nacional")
+st.title("Plataforma Inmobiliaria - Valle de Aburrá")
 st.subheader("Automatización de Dictámenes Técnicos (Resolución IGAC 620 de 2008)")
 st.markdown("---")
 
-# Inicializar la base de datos relacional y descargar municipios del DANE si es primera vez
+# Inicialización obligatoria de la base de datos de control
 pipeline_db.inicializar_db()
 
 if "procesado" not in st.session_state:
@@ -35,17 +35,14 @@ with col_adm1:
 with col_adm2:
     matricula = st.text_input("Número de Matrícula Inmobiliaria", "012-46368")
 
-# DROPDOWN INTELIGENTE CON COBERTURA DE TODA COLOMBIA (Vía DANE)
+# MENÚ EN CASCADA COMPLETO DEL VALLE DE ABURRÁ Y CORREGIMIENTOS
 col_geo1, col_geo2 = st.columns(2)
 with col_geo1:
-    lista_municipios_colombia = pipeline_db.obtainer_municipios_totales()
-    # Si la base de datos falló por red, usamos la lista de control
-    if not lista_municipios_colombia:
-        lista_municipios_colombia = ["Medellín", "Bello", "Girardota", "Bogotá", "Cali", "Barranquilla"]
-        
-    municipio = st.selectbox("Seleccione el Municipio (Catálogo Oficial DANE)", lista_municipios_colombia)
+    lista_municipios = pipeline_db.obtener_municipios_totales()
+    municipio = st.selectbox("Seleccione el Municipio", lista_municipios)
 with col_geo2:
-    barrio = st.text_input("Escriba el Barrio o Sector Oficial", "Ciudad Jardín")
+    lista_barrios = pipeline_db.obtener_barrios_por_municipio(municipio)
+    barrio = st.selectbox("Seleccione el Barrio o Corregimiento", lista_barrios)
 
 st.markdown("#### Especificaciones Físicas del Predio")
 col_fiz1, col_fiz2 = st.columns(2)

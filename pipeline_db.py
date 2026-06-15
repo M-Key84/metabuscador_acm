@@ -1,5 +1,4 @@
 import sqlite3
-import requests
 from datetime import datetime
 
 DB_NAME = "mercado_inmobiliario.db"
@@ -8,7 +7,7 @@ def inicializar_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Tabla maestro de ofertas
+    # Tabla de Ofertas de Mercado
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ofertas_portales (
             id_portal TEXT PRIMARY KEY,
@@ -25,61 +24,72 @@ def inicializar_db():
         )
     """)
     
-    # Tabla de caché geográfica nacional (DANE)
+    # Tabla Geográfica Maestra: Exclusiva Valle de Aburrá + Corregimientos
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS divipola_colombia (
+        CREATE TABLE IF NOT EXISTS geografia_aburra (
             municipio TEXT,
-            departamento TEXT,
-            PRIMARY KEY(municipio, departamento)
+            barrio_sector TEXT,
+            PRIMARY KEY(municipio, barrio_sector)
         )
     """)
     conn.commit()
     conn.close()
     
-    # Sembramos los municipios de toda Colombia de forma automática
-    poblar_municipios_dane()
+    # Sembramos el catálogo geográfico exacto solicitado
+    poblar_geografia_solicitada()
 
-def poblar_municipios_dane():
-    """Conexión al API de Datos Abiertos Colombia para devorar la estructura nacional"""
+def poblar_geografia_solicitada():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT COUNT(*) FROM divipola_colombia")
+    cursor.execute("SELECT COUNT(*) FROM geografia_aburra")
     if cursor.fetchone()[0] > 0:
         conn.close()
-        return # Ya está poblado, no gastamos ancho de banda
+        return
         
-    try:
-        # API oficial de municipios y departamentos de Colombia (Socrata API)
-        url = "https://datos.gov.co/resource/xdk5-pm3f.json?$limit=5000"
-        respuesta = requests.get(url, timeout=10)
-        if respuesta.status_code == 200:
-            datos = respuesta.json()
-            for item in datos:
-                mun = item.get("municipio", "").strip().title()
-                dep = item.get("departamento", "").strip().title()
-                if mun and dep:
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO divipola_colombia (municipio, departamento)
-                        VALUES (?, ?)
-                    """, (mun, dep))
-            conn.commit()
-    except Exception:
-        # Fallback de emergencia si el servidor de MinTIC está caído
-        fallbacks = [("Medellín", "Antioquia"), ("Bello", "Antioquia"), ("Girardota", "Antioquia"), 
-                     ("Bogotá", "Cundinamarca"), ("Cali", "Valle Del Cauca"), ("Barranquilla", "Atlántico")]
-        cursor.executemany("INSERT OR IGNORE INTO divipola_colombia (municipio, departamento) VALUES (?,?)", fallbacks)
-        conn.commit()
-    finally:
-        conn.close()
+    catatogo_real = [
+        # Medellín Urbano
+        ("Medellín", "El Poblado"), ("Medellín", "Laureles"), ("Medellín", "Belén"), 
+        ("Medellín", "Conquistadores"), ("Medellín", "Guayabal"), ("Medellín", "Robledo"), 
+        ("Medellín", "Aranjuez"), ("Medellín", "Buenos Aires"), ("Medellín", "La América"), 
+        ("Medellín", "San Javier"), ("Medellín", "Centro"),
+        # Corregimientos Oficiales de Medellín exigidos por Diego
+        ("Medellín", "Santa Elena (Corregimiento)"), 
+        ("Medellín", "San Cristóbal (Corregimiento)"), 
+        ("Medellín", "San Antonio de Prado (Corregimiento)"), 
+        ("Medellín", "San Sebastián de Palmitas (Corregimiento)"), 
+        ("Medellín", "Altavista (Corregimiento)"),
+        # Resto del Valle de Aburrá
+        ("Bello", "Cabañas"), ("Bello", "Niquía"), ("Bello", "Centro"), ("Bello", "Santa Ana"), ("Bello", "Bellavista"),
+        ("Envigado", "Aves María"), ("Envigado", "Otraparte"), ("Envigado", "El Dorado"), ("Envigado", "La Sebastiana"), ("Envigado", "Zúñiga"),
+        ("Sabaneta", "Centro"), ("Sabaneta", "La Doctora"), ("Sabaneta", "Pan de Azúcar"), ("Sabaneta", "Aliadas"),
+        ("Itagüí", "Simón Bolívar"), ("Itagüí", "Centro"), ("Itagüí", "Santa María"), ("Itagüí", "Ditaires"),
+        ("Copacabana", "Centro"), ("Copacabana", "Pedregal"), ("Copacabana", "Machado"),
+        ("La Estrella", "Centro"), ("La Estrella", "La Tablaza"), ("La Estrella", "Suramérica"),
+        ("Caldas", "Centro"), ("Caldas", "Andalucía"), ("Caldas", "La Valeria"),
+        ("Girardota", "Centro"), ("Girardota", "El Llano"), ("Girardota", "Guayacanes"), ("Girardota", "San Esteban"),
+        ("Barbosa", "Centro"), ("Barbosa", "El Hatillo")
+    ]
+    
+    cursor.executemany("INSERT OR IGNORE INTO geografia_aburra (municipio, barrio_sector) VALUES (?, ?)", catatogo_real)
+    conn.commit()
+    conn.close()
 
 def obtener_municipios_totales():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT municipio FROM divipola_colombia ORDER BY municipio ASC")
+    cursor.execute("SELECT DISTINCT municipio FROM geografia_aburra ORDER BY municipio ASC")
     municipios = [fila[0] for fila in cursor.fetchall()]
     conn.close()
     return municipios
+
+def obtener_barrios_por_municipio(municipio):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT barrio_sector FROM geografia_aburra WHERE municipio = ? ORDER BY barrio_sector ASC", (municipio,))
+    barrios = [fila[0] for fila in cursor.fetchall()]
+    conn.close()
+    return barrios
 
 def guardar_muestras_upsert(muestras):
     conn = sqlite3.connect(DB_NAME)
