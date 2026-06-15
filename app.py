@@ -9,13 +9,13 @@ from extractor import ExtractorInmobiliario
 from motor_acm import MotorACM
 import pipeline_db
 
-st.set_page_config(page_title="Portal Metabuscador ACM", layout="centered")
+st.set_page_config(page_title="Portal Metabuscador ACM Nacional", layout="centered")
 
-st.title("Plataforma Inmobiliaria y Motor ACM")
-st.subheader("Autorregulación y Control de Muestras (Resolución IGAC 620 de 2008)")
+st.title("Plataforma Inmobiliaria Universal - Motor ACM")
+st.subheader("Automatización de Dictámenes Técnicos Nacionales (Resolución IGAC 620 de 2008)")
 st.markdown("---")
 
-# INITIALIZACIÓN DEL ESTADO DE SESIÓN (La memoria del programa)
+# INICIALIZACIÓN DE VARIABLES DE ESTADO DE SESIÓN
 if "procesado" not in st.session_state:
     st.session_state.procesado = False
     st.session_state.muestras = []
@@ -46,14 +46,25 @@ with col_adm1:
 with col_adm2:
     matricula = st.text_input("Número de Matrícula Inmobiliaria", "012-46368")
 
-col_geo1, col_geo2 = st.columns(2)
-with col_geo1:
-    lista_municipios = sorted(df_ubicaciones["municipio"].unique())
-    municipio = st.selectbox("Municipio", lista_municipios)
-with col_geo2:
-    df_filtrado = df_ubicaciones[df_ubicaciones["municipio"] == municipio]
-    lista_barrios = sorted(df_filtrado["barrio"].unique())
-    barrio = st.selectbox("Barrio o Sector Oficial", lista_barrios)
+# CAPA GEOGRÁFICA FLEXIBLE: Permite buscar en la lista base o abrir cobertura a toda Colombia
+st.markdown("#### Cobertura Geográfica")
+cobertura = st.radio("Modo de Selección Geográfica:", ["Seleccionar de Lista Base (Antioquia)", "Cualquier Municipio de Colombia (Texto Libre)"])
+
+if cobertura == "Seleccionar de Lista Base (Antioquia)":
+    col_geo1, col_geo2 = st.columns(2)
+    with col_geo1:
+        lista_municipios = sorted(df_ubicaciones["municipio"].unique())
+        municipio = st.selectbox("Municipio", lista_municipios)
+    with col_geo2:
+        df_filtrado = df_ubicaciones[df_ubicaciones["municipio"] == municipio]
+        lista_barrios = sorted(df_filtrado["barrio"].unique())
+        barrio = st.selectbox("Barrio o Sector Oficial", lista_barrios)
+else:
+    col_geo1, col_geo2 = st.columns(2)
+    with col_geo1:
+        municipio = st.text_input("Escriba el nombre de CUALQUIER Municipio de Colombia", "Cali")
+    with col_geo2:
+        barrio = st.text_input("Escriba el nombre del Barrio o Sector", "Ciudad Jardín")
 
 st.markdown("#### Especificaciones Físicas del Predio")
 col_fiz1, col_fiz2 = st.columns(2)
@@ -71,7 +82,6 @@ st.markdown("---")
 
 def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
     wb = openpyxl.Workbook()
-    
     navy_header = "1B365D"
     navy_light = "F2F4F8"
     white = "FFFFFF"
@@ -152,7 +162,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
         
         area_val = m["area_construida"] if datos_obj["rph"] == "SÍ" else m["area_terreno"]
         ws2.cell(row=f, column=6, value=area_val).number_format = "#,##0.00"
-        
         ws2.cell(row=f, column=7, value=f"=E{f}/F{f}").number_format = "$#,##0"
         
         for col_c in range(1, 8):
@@ -231,7 +240,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
     buffer.seek(0)
     return buffer
 
-# BOTÓN DE EJECUCIÓN (Solo cambia el estado interno de memoria)
 if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_container_width=True):
     st.session_state.datos_inmueble = {
         "propietario": propietario,
@@ -259,7 +267,6 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
     st.session_state.media, st.session_state.desv, st.session_state.cv, st.session_state.aprobado = motor.analizar_estadistica_igac(st.session_state.valores_m2)
     st.session_state.procesado = True
 
-# LA CAPA VISUAL EXTERNA: Si ya fue procesado, se queda pintado pase lo que pase
 if st.session_state.procesado:
     st.markdown("---")
     st.markdown("### 📊 Tablero Analítico Métrico Temporal")
