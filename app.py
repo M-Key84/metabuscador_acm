@@ -1,6 +1,5 @@
 import streamlit as st
 import io
-import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -11,11 +10,13 @@ import pipeline_db
 
 st.set_page_config(page_title="Portal Metabuscador ACM Nacional", layout="centered")
 
-st.title("Plataforma Inmobiliaria Universal - Motor ACM")
-st.subheader("Automatización de Dictámenes Técnicos Nacionales (Resolución IGAC 620 de 2008)")
+st.title("Plataforma Inmobiliaria - Motor ACM Nacional")
+st.subheader("Automatización de Dictámenes Técnicos (Resolución IGAC 620 de 2008)")
 st.markdown("---")
 
-# INICIALIZACIÓN DE VARIABLES DE ESTADO DE SESIÓN
+# Inicializar la base de datos relacional y descargar municipios del DANE si es primera vez
+pipeline_db.inicializar_db()
+
 if "procesado" not in st.session_state:
     st.session_state.procesado = False
     st.session_state.muestras = []
@@ -26,18 +27,6 @@ if "procesado" not in st.session_state:
     st.session_state.aprobado = False
     st.session_state.datos_inmueble = {}
 
-@st.cache_data
-def cargar_diccionario_ubicaciones():
-    try:
-        return pd.read_csv("ubicaciones.csv")
-    except FileNotFoundError:
-        return pd.DataFrame({
-            "municipio": ["Bello", "Girardota", "Medellín"],
-            "barrio": ["Cabañas", "Centro", "El Poblado"]
-        })
-
-df_ubicaciones = cargar_diccionario_ubicaciones()
-
 st.markdown("### 🔍 Parámetros de Consulta del Inmueble Objetivo")
 
 col_adm1, col_adm2 = st.columns(2)
@@ -46,25 +35,17 @@ with col_adm1:
 with col_adm2:
     matricula = st.text_input("Número de Matrícula Inmobiliaria", "012-46368")
 
-# CAPA GEOGRÁFICA FLEXIBLE: Permite buscar en la lista base o abrir cobertura a toda Colombia
-st.markdown("#### Cobertura Geográfica")
-cobertura = st.radio("Modo de Selección Geográfica:", ["Seleccionar de Lista Base (Antioquia)", "Cualquier Municipio de Colombia (Texto Libre)"])
-
-if cobertura == "Seleccionar de Lista Base (Antioquia)":
-    col_geo1, col_geo2 = st.columns(2)
-    with col_geo1:
-        lista_municipios = sorted(df_ubicaciones["municipio"].unique())
-        municipio = st.selectbox("Municipio", lista_municipios)
-    with col_geo2:
-        df_filtrado = df_ubicaciones[df_ubicaciones["municipio"] == municipio]
-        lista_barrios = sorted(df_filtrado["barrio"].unique())
-        barrio = st.selectbox("Barrio o Sector Oficial", lista_barrios)
-else:
-    col_geo1, col_geo2 = st.columns(2)
-    with col_geo1:
-        municipio = st.text_input("Escriba el nombre de CUALQUIER Municipio de Colombia", "Cali")
-    with col_geo2:
-        barrio = st.text_input("Escriba el nombre del Barrio o Sector", "Ciudad Jardín")
+# DROPDOWN INTELIGENTE CON COBERTURA DE TODA COLOMBIA (Vía DANE)
+col_geo1, col_geo2 = st.columns(2)
+with col_geo1:
+    lista_municipios_colombia = pipeline_db.obtainer_municipios_totales()
+    # Si la base de datos falló por red, usamos la lista de control
+    if not lista_municipios_colombia:
+        lista_municipios_colombia = ["Medellín", "Bello", "Girardota", "Bogotá", "Cali", "Barranquilla"]
+        
+    municipio = st.selectbox("Seleccione el Municipio (Catálogo Oficial DANE)", lista_municipios_colombia)
+with col_geo2:
+    barrio = st.text_input("Escriba el Barrio o Sector Oficial", "Ciudad Jardín")
 
 st.markdown("#### Especificaciones Físicas del Predio")
 col_fiz1, col_fiz2 = st.columns(2)
@@ -226,7 +207,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
         for col_c in range(1, 4):
             ws3.cell(row=r, column=col_c).border = thin_border
 
-    for ws in [ws1, ws2, ws3]:
+    for ws in [wb[sn] for sn in wb.sheetnames]:
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = get_column_letter(col[0].column)
@@ -250,8 +231,6 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
         "area_construida": area_construida,
         "area_terreno": area_terreno
     }
-    
-    pipeline_db.inicializar_db()
     
     area_referencia = area_construida if rph == "SÍ" else area_terreno
     st.session_state.muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
