@@ -12,8 +12,19 @@ import pipeline_db
 st.set_page_config(page_title="Portal Metabuscador ACM", layout="centered")
 
 st.title("Plataforma Inmobiliaria y Motor ACM")
-st.subheader("Automatización de Dictámenes Técnicos (Resolución IGAC 620 de 2008)")
+st.subheader("Autorregulación y Control de Muestras (Resolución IGAC 620 de 2008)")
 st.markdown("---")
+
+# INITIALIZACIÓN DEL ESTADO DE SESIÓN (La memoria del programa)
+if "procesado" not in st.session_state:
+    st.session_state.procesado = False
+    st.session_state.muestras = []
+    st.session_state.valores_m2 = []
+    st.session_state.media = 0.0
+    st.session_state.desv = 0.0
+    st.session_state.cv = 0.0
+    st.session_state.aprobado = False
+    st.session_state.datos_inmueble = {}
 
 @st.cache_data
 def cargar_diccionario_ubicaciones():
@@ -75,7 +86,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
     thin_border = Border(left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'),
                          top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3'))
 
-    # PESTAÑA 1: FICHA DE ENTRADA CON CELDAS ABSOLUTAS FIJAS
     ws1 = wb.active
     ws1.title = "1. Inmueble Objetivo"
     ws1.views.sheetView[0].showGridLines = True
@@ -93,7 +103,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    # Mapeo rígido de filas para asegurar la vinculación elástica con la pestaña 3
     variables_mapeadas = [
         ("PROPIETARIO", datos_obj["propietario"]),
         ("MATRÍCULA INMOBILIARIA", datos_obj["matricula"]),
@@ -114,7 +123,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
             c_val.number_format = "#,##0.00"
             c_val.alignment = Alignment(horizontal="right")
 
-    # PESTAÑA 2: MATRIZ ELÁSTICA DEL METABUSCADOR
     ws2 = wb.create_sheet(title="2. Matriz de Homologación")
     ws2.views.sheetView[0].showGridLines = True
     ws2["A2"] = "ESTUDIO DE MERCADO - HOMOLOGACIÓN DE CELDAS DINÁMICAS"
@@ -144,6 +152,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
         
         area_val = m["area_construida"] if datos_obj["rph"] == "SÍ" else m["area_terreno"]
         ws2.cell(row=f, column=6, value=area_val).number_format = "#,##0.00"
+        
         ws2.cell(row=f, column=7, value=f"=E{f}/F{f}").number_format = "$#,##0"
         
         for col_c in range(1, 8):
@@ -158,7 +167,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
     ws2.cell(row=fila_prom, column=7, value=f"=AVERAGE(G{fila_inicio}:G{fila_fin})").font = font_bold
     ws2.cell(row=fila_prom, column=7).number_format = "$#,##0"
 
-    # PESTAÑA 3: ANALÍTICA ESTADÍSTICA FINAL (RESOLUCIÓN 620)
     ws3 = wb.create_sheet(title="3. Análisis Estadístico IGAC")
     ws3.views.sheetView[0].showGridLines = True
     ws3["A2"] = "DICTAMEN FINAL DE LIQUIDACIÓN CATASTRAL EN VIVO"
@@ -223,9 +231,9 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
     buffer.seek(0)
     return buffer
 
-# EJECUCIÓN INTEGRADA CON PIPELINE DB RESGUARDADO
+# BOTÓN DE EJECUCIÓN (Solo cambia el estado interno de memoria)
 if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_container_width=True):
-    datos_inmueble = {
+    st.session_state.datos_inmueble = {
         "propietario": propietario,
         "matricula": matricula,
         "municipio": municipio,
@@ -238,37 +246,43 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
     pipeline_db.inicializar_db()
     
     area_referencia = area_construida if rph == "SÍ" else area_terreno
-    muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
+    st.session_state.muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
     
-    if len(muestras) == 0:
-        st.warning("⚠️ No se encontraron ofertas indexadas en el almacén local. Activando robot extractor en tiempo real...")
+    if len(st.session_state.muestras) == 0:
         extractor = ExtractorInmobiliario()
         muestras_internet = extractor.raspar_portal_simulado(municipio, barrio, rph)
         pipeline_db.guardar_muestras_upsert(muestras_internet)
-        muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
+        st.session_state.muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
 
     motor = MotorACM()
-    valores_m2 = motor.procesar_homogenizacion(muestras, rph)
-    media, desv, cv, aprobado = motor.analizar_estadistica_igac(valores_m2)
-    
+    st.session_state.valores_m2 = motor.procesar_homogenizacion(st.session_state.muestras, rph)
+    st.session_state.media, st.session_state.desv, st.session_state.cv, st.session_state.aprobado = motor.analizar_estadistica_igac(st.session_state.valores_m2)
+    st.session_state.procesado = True
+
+# LA CAPA VISUAL EXTERNA: Si ya fue procesado, se queda pintado pase lo que pase
+if st.session_state.procesado:
     st.markdown("---")
     st.markdown("### 📊 Tablero Analítico Métrico Temporal")
     
     col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Valor Promedio por M²", f"${media:,.2f}")
-    col_m2.metric("Coeficiente de Variación (CV)", f"{cv*100:.2f}%")
+    col_m1.metric("Valor Promedio por M²", f"${st.session_state.media:,.2f}")
+    col_m2.metric("Coeficiente de Variación (CV)", f"{st.session_state.cv*100:.2f}%")
     
-    if aprobado:
+    if st.session_state.aprobado:
         st.success("✔️ Control Calidad: Muestra Consistente. Cumple la restricción legal (CV <= 15%).")
     else:
         st.error("❌ Alerta de Dispersión: El CV del mercado supera el 15% normativo. Los datos de la zona están desalineados.")
         
-    excel_final = fabricar_excel_con_formulas_vivas(datos_inmueble, muestras, valores_m2)
+    excel_final = fabricar_excel_con_formulas_vivas(
+        st.session_state.datos_inmueble, 
+        st.session_state.muestras, 
+        st.session_state.valores_m2
+    )
     
     st.download_button(
         label="📥 Descargar Dictamen Técnico Completo (Excel con Fórmulas)",
         data=excel_final,
-        file_name=f"ACM_AUTOMATICO_{barrio}_{municipio}.xlsx",
+        file_name=f"ACM_AUTOMATICO_{st.session_state.datos_inmueble['barrio']}_{st.session_state.datos_inmueble['municipio']}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
