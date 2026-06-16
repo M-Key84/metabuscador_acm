@@ -17,14 +17,19 @@ class MotorACM:
     def procesar_homogenizacion(self, muestras, es_rph):
         valores_m2_homogenizados = []
         for m in muestras:
-            # precio_depurado = precio_oferta * fn
-            precio_depurado = m["precio_oferta"] * m.get("fn", 0.95)
+            # Usamos .get(key, 0.95) para evitar que el programa se rompa si falta el dato
+            fn = m.get("fn", 0.95)
+            precio_depurado = m["precio_oferta"] * fn
+            
             area = m["area_construida"] if es_rph == "SÍ" else m["area_terreno"]
             valor_m2_dep = precio_depurado / area
             
-            # factor_resultante = fu * fe * fc
-            fr = m["f_ubicacion"] * m["f_edad"] * m["f_caracteristicas"]
-            # valor_homogenizado = valor_m2_dep * fr
+            # Usamos .get(key, 1.0) para que si falta el dato, el factor sea neutro
+            fu = m.get("f_ubicacion", 1.0)
+            fe = m.get("f_edad", 1.0)
+            fc = m.get("f_caracteristicas", 1.0)
+            
+            fr = fu * fe * fc
             valores_m2_homogenizados.append(valor_m2_dep * fr)
         return valores_m2_homogenizados
 
