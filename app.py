@@ -75,7 +75,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     thin_border = Border(left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'),
                          top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3'))
 
-    # PESTAÑA 1: INMUEBLE OBJETIVO
+    # ========== PESTAÑA 1: FICHA DEL INMUEBLE OBJETIVO ==========
     ws1 = wb.active
     ws1.title = "1. Ficha Inmueble Objetivo"
     ws1.views.sheetView[0].showGridLines = True
@@ -112,8 +112,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws1.cell(row=i, column=1).border = thin_border
         c_val.border = thin_border
 
-    # PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN
-    ws2 = wb.create_sheet(title="2. Matriz Homologación ACM")
+    # ========== PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN ==========
+    ws2 = wb.create_sheet(title="Homologación")
     ws2.views.sheetView[0].showGridLines = True
     ws2["A2"] = "MATRIZ DE HOMOLOGACIÓN Y AJUSTE DE MUESTRAS EN VIVO"
     ws2["A2"].font = font_title
@@ -165,11 +165,10 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     fila_prom = fila_fin + 2
     
     ws2.cell(row=fila_prom, column=1, value="PROMEDIO").font = font_bold
-    # Fórmula en español (Excel la traducirá al idioma del usuario)
     ws2.cell(row=fila_prom, column=12, value=f"=PROMEDIO(L{fila_inicio}:L{fila_fin})").font = font_bold
     ws2.cell(row=fila_prom, column=12).number_format = "#,##0"
 
-    # PESTAÑA 3: ANÁLISIS ESTADÍSTICO CON FÓRMULAS NATIVAS DE EXCEL
+    # ========== PESTAÑA 3: ANÁLISIS ESTADÍSTICO ==========
     ws3 = wb.create_sheet(title="3. Análisis Estadístico IGAC")
     ws3.views.sheetView[0].showGridLines = True
     ws3["A2"] = "CÁLCULOS ESTADÍSTICOS Y CÁLCULO DE VALOR COMERCIAL"
@@ -187,15 +186,20 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
+    # --- Constantes en celdas ocultas para evitar el punto decimal en fórmulas ---
+    ws3["D10"] = 1.075
+    ws3["D10"].number_format = "0.000"
+    ws3["D11"] = 0.925
+    ws3["D11"].number_format = "0.000"
+
     ws3["A6"] = "Promedio del Valor M² Homogenizado"
-    ws3["B6"] = f"='2. Matriz Homologación ACM'!L{fila_prom}"
+    ws3["B6"] = f"=Homologación!L{fila_prom}"
     ws3["B6"].number_format = "#,##0"
     ws3["B6"].font = font_bold
     ws3["C6"] = "Base para la liquidación del metro cuadrado"
     
     ws3["A7"] = "Desviación Estándar de la Muestra (σ)"
-    # Fórmula en español (compatible con cualquier idioma al abrir)
-    ws3["B7"] = f"=DESVEST.M('2. Matriz Homologación ACM'!L{fila_inicio}:L{fila_fin})"
+    ws3["B7"] = f"=DESVEST.M(Homologación!L{fila_inicio}:L{fila_fin})"
     ws3["B7"].number_format = "#,##0"
     ws3["C7"] = "Mide el grado de dispersión de los precios de los portales"
     
@@ -206,17 +210,16 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C8"] = "CRITERIO DE ALTA PRECISIÓN: Debe ser menor o igual al 7.50%"
     
     ws3["A9"] = "Coeficiente de Asimetría"
-    # Fórmula en español
-    ws3["B9"] = f"=COEFICIENTE.ASIMETRIA('2. Matriz Homologación ACM'!L{fila_inicio}:L{fila_fin})"
+    ws3["B9"] = f"=COEFICIENTE.ASIMETRIA(Homologación!L{fila_inicio}:L{fila_fin})"
     ws3["B9"].number_format = "0.00"
     ws3["C9"] = "Mide la tendencia de sesgo de las ofertas"
 
     ws3["A10"] = "Límite Superior (7.5%)"
-    ws3["B10"] = "=B6*1.075"
+    ws3["B10"] = "=B6*D10"
     ws3["B10"].number_format = "#,##0"
     
     ws3["A11"] = "Límite Inferior (7.5%)"
-    ws3["B11"] = "=B6*0.925"
+    ws3["B11"] = "=B6*D11"
     ws3["B11"].number_format = "#,##0"
 
     ws3["A13"] = "LIQUIDACIÓN DEL VALOR COMERCIAL CONFORME A LA RESOLUCIÓN"
@@ -243,6 +246,9 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     for r in [6, 7, 8, 9, 10, 11, 15, 16, 17]:
         for col_c in range(1, 4):
             ws3.cell(row=r, column=col_c).border = thin_border
+
+    # Ocultar columna con constantes
+    ws3.column_dimensions["D"].hidden = True
 
     for ws in [ws1, ws2, ws3]:
         for col in ws.columns:
