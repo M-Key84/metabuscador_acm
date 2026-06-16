@@ -57,11 +57,10 @@ def inicializar_db():
 def poblar_geografia_solicitada():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM geografia_aburra")
-    if cursor.fetchone()[0] > 0:
-        conn.close()
-        return
-
+    
+    # ⚠️ CORRECCIÓN: Limpiar la tabla para forzar la recarga completa
+    cursor.execute("DELETE FROM geografia_aburra")
+    
     # ============ CATÁLOGO EXHAUSTIVO VALLE DE ABURRÁ ============
     # Fuentes: DANE - Divipola, mapas oficiales de cada municipio.
 
