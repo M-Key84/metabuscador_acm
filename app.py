@@ -112,8 +112,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws1.cell(row=i, column=1).border = thin_border
         c_val.border = thin_border
 
-    # ========== PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN ==========
-    ws2 = wb.create_sheet(title="Homologación")
+    # ========== PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN (sin tilde) ==========
+    ws2 = wb.create_sheet(title="Homologacion")
     ws2.views.sheetView[0].showGridLines = True
     ws2["A2"] = "MATRIZ DE HOMOLOGACIÓN Y AJUSTE DE MUESTRAS EN VIVO"
     ws2["A2"].font = font_title
@@ -186,20 +186,20 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    # --- Constantes en celdas ocultas para evitar el punto decimal en fórmulas ---
+    # --- Constantes en celdas ocultas ---
     ws3["D10"] = 1.075
     ws3["D10"].number_format = "0.000"
     ws3["D11"] = 0.925
     ws3["D11"].number_format = "0.000"
 
     ws3["A6"] = "Promedio del Valor M² Homogenizado"
-    ws3["B6"] = f"=Homologación!L{fila_prom}"
+    ws3["B6"] = f"=Homologacion!L{fila_prom}"          # sin tilde -> sin comillas
     ws3["B6"].number_format = "#,##0"
     ws3["B6"].font = font_bold
     ws3["C6"] = "Base para la liquidación del metro cuadrado"
     
     ws3["A7"] = "Desviación Estándar de la Muestra (σ)"
-    ws3["B7"] = f"=DESVEST.M(Homologación!L{fila_inicio}:L{fila_fin})"
+    ws3["B7"] = f"=DESVEST.M(Homologacion!L{fila_inicio}:L{fila_fin})"
     ws3["B7"].number_format = "#,##0"
     ws3["C7"] = "Mide el grado de dispersión de los precios de los portales"
     
@@ -210,7 +210,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C8"] = "CRITERIO DE ALTA PRECISIÓN: Debe ser menor o igual al 7.50%"
     
     ws3["A9"] = "Coeficiente de Asimetría"
-    ws3["B9"] = f"=COEFICIENTE.ASIMETRIA(Homologación!L{fila_inicio}:L{fila_fin})"
+    ws3["B9"] = f"=COEFICIENTE.ASIMETRIA(Homologacion!L{fila_inicio}:L{fila_fin})"
     ws3["B9"].number_format = "0.00"
     ws3["C9"] = "Mide la tendencia de sesgo de las ofertas"
 
@@ -247,7 +247,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         for col_c in range(1, 4):
             ws3.cell(row=r, column=col_c).border = thin_border
 
-    # Ocultar columna con constantes
     ws3.column_dimensions["D"].hidden = True
 
     for ws in [ws1, ws2, ws3]:
