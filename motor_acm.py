@@ -2,47 +2,45 @@ import numpy as np
 
 class MotorACM:
     def __init__(self):
-        self.factor_negociacion = 0.95
+        pass
 
-    def calcular_depreciacion_fitto_corvini(self, edad, estado):
-        if edad < 5:
-            depreciacion = 0.05
-        elif edad < 15:
-            depreciacion = 0.18
-        elif edad < 30:
-            depreciacion = 0.35
-        else:
-            depreciacion = 0.55
-            
-        if estado == "Regular":
-            depreciacion += 0.10
-        elif estado == "Malo":
-            depreciacion += 0.25
-        return max(0.10, 1 - depreciacion)
+    def calcular_asimetria_excel(self, datos):
+        """Calcula el coeficiente de asimetría exactamente igual a la fórmula SKEW de Excel"""
+        n = len(datos)
+        if n < 3: return 0.0
+        mean = np.mean(datos)
+        std = np.std(datos, ddof=1)
+        if std == 0: return 0.0
+        suma_cubos = np.sum(((datos - mean) / std) ** 3)
+        return (n / ((n - 1) * (n - 2))) * suma_cubos
 
-    def procesar_homogenizacion(self, muestras, es_rph, costo_nuevo_m2=3435827):
-        valores_m2_calculados = []
+    def procesar_homogenizacion(self, muestras, es_rph):
+        valores_m2_homogenizados = []
         for m in muestras:
-            precio_depurado = m["precio_oferta"] * self.factor_negociacion
+            # precio_depurado = precio_oferta * fn
+            precio_depurado = m["precio_oferta"] * m["fn"]
+            area = m["area_construida"] if es_rph == "SÍ" else m["area_terreno"]
+            valor_m2_dep = precio_depurado / area
             
-            if es_rph == "SÍ":
-                valor_unitario = precio_depurado / m["area_construida"]
-                valores_m2_calculados.append(valor_unitario)
-            else:
-                factor_remanente = self.calcular_depreciacion_fitto_corvini(m["edad_construccion"], "Bueno")
-                valor_construccion_depreciada = m["area_construida"] * costo_nuevo_m2 * factor_remanente
-                valor_terreno_neto = precio_depurado - valor_construccion_depreciada
-                valor_unitario_terreno = valor_terreno_neto / m["area_terreno"]
-                valores_m2_calculados.append(valor_unitario_terreno)
-        return valores_m2_calculados
+            # factor_resultante = fu * fe * fc
+            fr = m["f_ubicacion"] * m["f_edad"] * m["f_caracteristicas"]
+            # valor_homogenizado = valor_m2_dep * fr
+            valores_m2_homogenizados.append(valor_m2_dep * fr)
+        return valores_m2_homogenizados
 
     def analizar_estadistica_igac(self, valores_m2):
         if len(valores_m2) < 3:
-            return 0.0, 0.0, 0.0, False
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, False
+        
         promedio = float(np.mean(valores_m2))
         desviacion = float(np.std(valores_m2, ddof=1))
         coeficiente_variacion = desviacion / promedio if promedio > 0 else 0.0
+        asimetria = self.calcular_asimetria_excel(valores_m2)
         
-        # AJUSTE DE REGLA CRÍTICA: Control de calidad interno fijado al 7.5% exigido por Diego
-        es_valido_diego = coeficiente_variacion <= 0.075
-        return promedio, desviacion, coeficiente_variacion, es_valido_diego
+        # Límites operativos del 7.5% de Diego desmenuzados de sus archivos
+        limite_superior = promedio * 1.075
+        limite_inferior = promedio * 0.925
+        
+        # Filtro estricto del 7.5% exigido por Diego Palacio
+        es_valido = coeficiente_variacion <= 0.075
+        return promedio, desviacion, coeficiente_variacion, asimetria, limite_superior, limite_inferior, es_valido
