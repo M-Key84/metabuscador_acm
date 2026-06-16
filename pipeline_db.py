@@ -28,6 +28,20 @@ def inicializar_db():
         )
     """)
     
+    # Migración segura: añadir columnas de factores si no existen (para bases de datos antiguas)
+    columnas_factores = [
+        ("fn", "REAL"),
+        ("f_ubicacion", "REAL"),
+        ("f_edad", "REAL"),
+        ("f_caracteristicas", "REAL")
+    ]
+    for nombre_col, tipo_col in columnas_factores:
+        try:
+            cursor.execute(f"ALTER TABLE ofertas_portales ADD COLUMN {nombre_col} {tipo_col}")
+        except sqlite3.OperationalError:
+            # La columna ya existe, ignorar error
+            pass
+    
     # Tabla Geográfica Maestra: Exclusiva Valle de Aburrá + Corregimientos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS geografia_aburra (
@@ -94,17 +108,14 @@ def guardar_muestras_upsert(muestras):
     cursor = conn.cursor()
     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
     
-    # Claves obligatorias para cada muestra
     REQUERIDAS = [
         "id_portal", "portal", "municipio", "barrio",
         "precio_oferta", "area_construida", "area_terreno", "edad_construccion"
     ]
     
     for i, m in enumerate(muestras):
-        # Verificar que la muestra tenga todas las claves necesarias
         if not all(k in m for k in REQUERIDAS):
-            # Si falta alguna clave, se omite la muestra (se puede registrar en logs si se desea)
-            continue
+            continue   # omitir muestras incompletas
         
         try:
             cursor.execute("""

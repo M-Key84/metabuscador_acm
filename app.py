@@ -141,7 +141,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws2.cell(row=f, column=1, value=f"Muestra {idx+1}").alignment = Alignment(horizontal="center")
         ws2.cell(row=f, column=2, value=m["portal"])
         ws2.cell(row=f, column=3, value=m["precio_oferta"]).number_format = "#,##0"
-        ws2.cell(row=f, column=4, value=m["fn"]).number_format = "0.00"
+        ws2.cell(row=f, column=4, value=m.get("fn", 0.95)).number_format = "0.00"
         
         # Fórmulas Vivas de Excel
         ws2.cell(row=f, column=5, value=f"=C{f}*D{f}").number_format = "#,##0"
@@ -149,9 +149,10 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws2.cell(row=f, column=6, value=area_val).number_format = "#,##0.00"
         ws2.cell(row=f, column=7, value=f"=E{f}/F{f}").number_format = "#,##0"
         
-        ws2.cell(row=f, column=8, value=m["f_ubicacion"]).number_format = "0.00"
-        ws2.cell(row=f, column=9, value=m["f_edad"]).number_format = "0.00"
-        ws2.cell(row=f, column=10, value=m["f_caracteristicas"]).number_format = "0.00"
+        # CORRECCIÓN: usar .get() para los factores de homologación
+        ws2.cell(row=f, column=8, value=m.get("f_ubicacion", 1.0)).number_format = "0.00"
+        ws2.cell(row=f, column=9, value=m.get("f_edad", 1.0)).number_format = "0.00"
+        ws2.cell(row=f, column=10, value=m.get("f_caracteristicas", 1.0)).number_format = "0.00"
         
         ws2.cell(row=f, column=11, value=f"=H{f}*I{f}*J{f}").number_format = "0.00"
         ws2.cell(row=f, column=12, value=f"=G{f}*K{f}").number_format = "#,##0"
