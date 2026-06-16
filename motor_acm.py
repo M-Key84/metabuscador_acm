@@ -18,7 +18,7 @@ class MotorACM:
         valores_m2_homogenizados = []
         for m in muestras:
             # precio_depurado = precio_oferta * fn
-            precio_depurado = m["precio_oferta"] * m["fn"]
+            precio_depurado = m["precio_oferta"] * m.get("fn", 0.95)
             area = m["area_construida"] if es_rph == "SÍ" else m["area_terreno"]
             valor_m2_dep = precio_depurado / area
             
