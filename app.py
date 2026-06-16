@@ -112,7 +112,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws1.cell(row=i, column=1).border = thin_border
         c_val.border = thin_border
 
-    # PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN (Idéntica a la estructura de Diego)
+    # PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN
     ws2 = wb.create_sheet(title="2. Matriz Homologación ACM")
     ws2.views.sheetView[0].showGridLines = True
     ws2["A2"] = "MATRIZ DE HOMOLOGACIÓN Y AJUSTE DE MUESTRAS EN VIVO"
@@ -149,7 +149,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws2.cell(row=f, column=6, value=area_val).number_format = "#,##0.00"
         ws2.cell(row=f, column=7, value=f"=E{f}/F{f}").number_format = "#,##0"
         
-        # CORRECCIÓN: usar .get() para los factores de homologación
         ws2.cell(row=f, column=8, value=m.get("f_ubicacion", 1.0)).number_format = "0.00"
         ws2.cell(row=f, column=9, value=m.get("f_edad", 1.0)).number_format = "0.00"
         ws2.cell(row=f, column=10, value=m.get("f_caracteristicas", 1.0)).number_format = "0.00"
