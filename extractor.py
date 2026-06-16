@@ -66,6 +66,7 @@ class ExtractorInmobiliario:
                 "precio_oferta": precio_oferta,
                 "area_construida": area_c,
                 "area_terreno": area_t,
+                "edad_construccion": random.randint(0, 30),  # <--- CAMPO AGREGADO
                 "fn": round(random.uniform(0.92, 0.95), 2),
                 "f_ubicacion": round(random.uniform(0.96, 1.02), 2),
                 "f_edad": round(random.uniform(0.95, 1.01), 2),
