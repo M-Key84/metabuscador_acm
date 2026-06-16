@@ -94,7 +94,18 @@ def guardar_muestras_upsert(muestras):
     cursor = conn.cursor()
     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
     
-    for m in muestras:
+    # Claves obligatorias para cada muestra
+    REQUERIDAS = [
+        "id_portal", "portal", "municipio", "barrio",
+        "precio_oferta", "area_construida", "area_terreno", "edad_construccion"
+    ]
+    
+    for i, m in enumerate(muestras):
+        # Verificar que la muestra tenga todas las claves necesarias
+        if not all(k in m for k in REQUERIDAS):
+            # Si falta alguna clave, se omite la muestra (se puede registrar en logs si se desea)
+            continue
+        
         try:
             cursor.execute("""
                 INSERT INTO ofertas_portales 
