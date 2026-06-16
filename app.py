@@ -8,13 +8,12 @@ from extractor import ExtractorInmobiliario
 from motor_acm import MotorACM
 import pipeline_db
 
-st.set_page_config(page_title="Metabuscador ACM Aburrá", layout="centered")
+st.set_page_config(page_title="Metabuscador ACM Aburrá Pro", layout="centered")
 
 st.title("Plataforma Inmobiliaria - Valle de Aburrá")
-st.subheader("Automatización de Dictámenes Técnicos (Resolución IGAC 620 de 2008)")
+st.subheader("Automatización de Dictámenes Técnicos (Control de Calidad Interno: 7.5%)")
 st.markdown("---")
 
-# Inicialización obligatoria de la base de datos de control
 pipeline_db.inicializar_db()
 
 if "procesado" not in st.session_state:
@@ -35,7 +34,6 @@ with col_adm1:
 with col_adm2:
     matricula = st.text_input("Número de Matrícula Inmobiliaria", "012-46368")
 
-# MENÚ EN CASCADA COMPLETO DEL VALLE DE ABURRÁ Y CORREGIMIENTOS
 col_geo1, col_geo2 = st.columns(2)
 with col_geo1:
     lista_municipios = pipeline_db.obtener_municipios_totales()
@@ -182,11 +180,13 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
     ws3["B8"] = "=B7/B6"
     ws3["B8"].number_format = "0.00%"
     ws3["B8"].font = font_bold
-    ws3["C8"] = "OBLIGATORIO: Máximo 15.00%"
+    
+    # CONTROL DE CALIDAD INTERNO INYECTADO AL EXCEL
+    ws3["C8"] = "CRITERIO ESTRICTO EVALUADOR: Máx 7.50%"
     ws3["C8"].font = font_bold
     
     ws3["A10"] = "Validación Jurídica del Estudio:"
-    ws3["B10"] = '=IF(B8<=0.15,"ACEPTADO (Estudio Estable)","RECHAZADO POR ALTA DISPERSIÓN")'
+    ws3["B10"] = '=IF(B8<=0.075,"ACEPTADO (Alta Precisión)","RECHAZADO POR ALTA DISPERSIÓN")'
     ws3["B10"].font = font_bold
     
     ws3["A13"] = "Área Total a Liquidar del Objetivo:"
@@ -211,7 +211,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras, valores_m2):
             ws.column_dimensions[col_letter].width = max(max_len + 3, 15)
             
     ws3.column_dimensions["A"].width = 35
-    ws3.column_dimensions["C"].width = 28
+    ws3.column_dimensions["C"].width = 35
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -251,10 +251,11 @@ if st.session_state.procesado:
     col_m1.metric("Valor Promedio por M²", f"${st.session_state.media:,.2f}")
     col_m2.metric("Coeficiente de Variación (CV)", f"{st.session_state.cv*100:.2f}%")
     
+    # VALIDACIÓN DEL SEMÁFORO SEGÚN EL FILTRO DE 7.5% DE DIEGO
     if st.session_state.aprobado:
-        st.success("✔️ Control Calidad: Muestra Consistente. Cumple la restricción legal (CV <= 15%).")
+        st.success("✔️ Control Calidad Aceptado: Muestra Consistente de Alta Precisión (CV <= 7.5%).")
     else:
-        st.error("❌ Alerta de Dispersión: El CV del mercado supera el 15% normativo. Los datos de la zona están desalineados.")
+        st.error("❌ Alerta de Dispersión: El CV supera el 7.5% de control interno exigido para dictámenes corporativos.")
         
     excel_final = fabricar_excel_con_formulas_vivas(
         st.session_state.datos_inmueble, 
