@@ -14,23 +14,42 @@ class MotorACM:
         suma_cubos = np.sum(((datos - mean) / std) ** 3)
         return (n / ((n - 1) * (n - 2))) * suma_cubos
 
+    def _float_safe(self, valor, default=0.0):
+        """Convierte un valor a float de forma segura, devuelve default si es None o no convertible"""
+        try:
+            if valor is None:
+                return default
+            return float(valor)
+        except (ValueError, TypeError):
+            return default
+
     def procesar_homogenizacion(self, muestras, es_rph):
         valores_m2_homogenizados = []
         for m in muestras:
-            # Usamos .get(key, 0.95) para evitar que el programa se rompa si falta el dato
-            fn = m.get("fn", 0.95)
-            precio_depurado = m["precio_oferta"] * fn
+            # Convertir campos numéricos de forma segura
+            precio_oferta = self._float_safe(m.get("precio_oferta"))
+            fn = self._float_safe(m.get("fn"), 0.95)
             
-            area = m["area_construida"] if es_rph == "SÍ" else m["area_terreno"]
+            # Si el precio es 0 o negativo, omitir muestra
+            if precio_oferta <= 0:
+                continue
+                
+            area = self._float_safe(
+                m.get("area_construida") if es_rph == "SÍ" else m.get("area_terreno")
+            )
+            if area <= 0:
+                continue
+            
+            precio_depurado = precio_oferta * fn
             valor_m2_dep = precio_depurado / area
             
-            # Usamos .get(key, 1.0) para que si falta el dato, el factor sea neutro
-            fu = m.get("f_ubicacion", 1.0)
-            fe = m.get("f_edad", 1.0)
-            fc = m.get("f_caracteristicas", 1.0)
+            fu = self._float_safe(m.get("f_ubicacion"), 1.0)
+            fe = self._float_safe(m.get("f_edad"), 1.0)
+            fc = self._float_safe(m.get("f_caracteristicas"), 1.0)
             
             fr = fu * fe * fc
             valores_m2_homogenizados.append(valor_m2_dep * fr)
+            
         return valores_m2_homogenizados
 
     def analizar_estadistica_igac(self, valores_m2):
