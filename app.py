@@ -272,7 +272,7 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
     
     if len(st.session_state.muestras) == 0:
         extractor = ExtractorInmobiliario()
-        muestras_internet = extractor.raspar_portal_simulado(municipio, barrio, rph)
+        muestras_internet = extractor.raspar_portal_real(municipio, barrio, rph)
         pipeline_db.guardar_muestras_upsert(muestras_internet)
         st.session_state.muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
 
