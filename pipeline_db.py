@@ -7,7 +7,7 @@ def inicializar_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Tabla de Ofertas de Mercado
+    # Tabla de Ofertas con todos los campos de homologación requeridos por Diego
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ofertas_portales (
             id_portal TEXT PRIMARY KEY,
@@ -18,6 +18,10 @@ def inicializar_db():
             area_construida REAL,
             area_terreno REAL,
             edad_construccion INTEGER,
+            fn REAL,
+            f_ubicacion REAL,
+            f_edad REAL,
+            f_caracteristicas REAL,
             estado TEXT DEFAULT 'ACTIVO',
             fecha_creacion TEXT,
             ultima_vista TEXT
@@ -35,31 +39,26 @@ def inicializar_db():
     conn.commit()
     conn.close()
     
-    # Sembramos el catálogo geográfico exacto solicitado
     poblar_geografia_solicitada()
 
 def poblar_geografia_solicitada():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    
     cursor.execute("SELECT COUNT(*) FROM geografia_aburra")
     if cursor.fetchone()[0] > 0:
         conn.close()
         return
         
     catatogo_real = [
-        # Medellín Urbano
         ("Medellín", "El Poblado"), ("Medellín", "Laureles"), ("Medellín", "Belén"), 
         ("Medellín", "Conquistadores"), ("Medellín", "Guayabal"), ("Medellín", "Robledo"), 
         ("Medellín", "Aranjuez"), ("Medellín", "Buenos Aires"), ("Medellín", "La América"), 
         ("Medellín", "San Javier"), ("Medellín", "Centro"),
-        # Corregimientos Oficiales de Medellín exigidos por Diego
         ("Medellín", "Santa Elena (Corregimiento)"), 
         ("Medellín", "San Cristóbal (Corregimiento)"), 
         ("Medellín", "San Antonio de Prado (Corregimiento)"), 
         ("Medellín", "San Sebastián de Palmitas (Corregimiento)"), 
         ("Medellín", "Altavista (Corregimiento)"),
-        # Resto del Valle de Aburrá
         ("Bello", "Cabañas"), ("Bello", "Niquía"), ("Bello", "Centro"), ("Bello", "Santa Ana"), ("Bello", "Bellavista"),
         ("Envigado", "Aves María"), ("Envigado", "Otraparte"), ("Envigado", "El Dorado"), ("Envigado", "La Sebastiana"), ("Envigado", "Zúñiga"),
         ("Sabaneta", "Centro"), ("Sabaneta", "La Doctora"), ("Sabaneta", "Pan de Azúcar"), ("Sabaneta", "Aliadas"),
@@ -70,7 +69,6 @@ def poblar_geografia_solicitada():
         ("Girardota", "Centro"), ("Girardota", "El Llano"), ("Girardota", "Guayacanes"), ("Girardota", "San Esteban"),
         ("Barbosa", "Centro"), ("Barbosa", "El Hatillo")
     ]
-    
     cursor.executemany("INSERT OR IGNORE INTO geografia_aburra (municipio, barrio_sector) VALUES (?, ?)", catatogo_real)
     conn.commit()
     conn.close()
@@ -100,19 +98,21 @@ def guardar_muestras_upsert(muestras):
         try:
             cursor.execute("""
                 INSERT INTO ofertas_portales 
-                (id_portal, portal, municipio, barrio, precio_oferta, area_construida, area_terreno, edad_construccion, fecha_creacion, ultima_vista)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id_portal, portal, municipio, barrio, precio_oferta, area_construida, area_terreno, edad_construccion, fn, f_ubicacion, f_edad, f_caracteristicas, fecha_creacion, ultima_vista)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 m["id_portal"], m["portal"], m["municipio"], m["barrio"],
                 m["precio_oferta"], m["area_construida"], m["area_terreno"],
-                m["edad_construccion"], fecha_hoy, fecha_hoy
+                m["edad_construccion"], m.get("fn", 0.95), m.get("f_ubicacion", 1.0), 
+                m.get("f_edad", 1.0), m.get("f_caracteristicas", 1.0), fecha_hoy, fecha_hoy
             ))
         except sqlite3.IntegrityError:
             cursor.execute("""
                 UPDATE ofertas_portales
-                SET precio_oferta = ?, ultima_vista = ?, estado = 'ACTIVO'
+                SET precio_oferta = ?, fn = ?, f_ubicacion = ?, f_edad = ?, f_caracteristicas = ?, ultima_vista = ?, estado = 'ACTIVO'
                 WHERE id_portal = ?
-            """, (m["precio_oferta"], fecha_hoy, m["id_portal"]))
+            """, (m["precio_oferta"], m.get("fn", 0.95), m.get("f_ubicacion", 1.0), 
+                  m.get("f_edad", 1.0), m.get("f_caracteristicas", 1.0), fecha_hoy, m["id_portal"]))
             
     conn.commit()
     conn.close()
