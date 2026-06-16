@@ -165,7 +165,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     fila_prom = fila_fin + 2
     
     ws2.cell(row=fila_prom, column=1, value="PROMEDIO").font = font_bold
-    ws2.cell(row=fila_prom, column=12, value=f"=AVERAGE(L{fila_inicio}:L{fila_fin})").font = font_bold
+    # Fórmula en español (Excel la traducirá al idioma del usuario)
+    ws2.cell(row=fila_prom, column=12, value=f"=PROMEDIO(L{fila_inicio}:L{fila_fin})").font = font_bold
     ws2.cell(row=fila_prom, column=12).number_format = "#,##0"
 
     # PESTAÑA 3: ANÁLISIS ESTADÍSTICO CON FÓRMULAS NATIVAS DE EXCEL
@@ -193,7 +194,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C6"] = "Base para la liquidación del metro cuadrado"
     
     ws3["A7"] = "Desviación Estándar de la Muestra (σ)"
-    ws3["B7"] = f"=STDEV.S('2. Matriz Homologación ACM'!L{fila_inicio}:L{fila_fin})"
+    # Fórmula en español (compatible con cualquier idioma al abrir)
+    ws3["B7"] = f"=DESVEST.M('2. Matriz Homologación ACM'!L{fila_inicio}:L{fila_fin})"
     ws3["B7"].number_format = "#,##0"
     ws3["C7"] = "Mide el grado de dispersión de los precios de los portales"
     
@@ -204,7 +206,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C8"] = "CRITERIO DE ALTA PRECISIÓN: Debe ser menor o igual al 7.50%"
     
     ws3["A9"] = "Coeficiente de Asimetría"
-    ws3["B9"] = f"=SKEW('2. Matriz Homologación ACM'!L{fila_inicio}:L{fila_fin})"
+    # Fórmula en español
+    ws3["B9"] = f"=COEFICIENTE.ASIMETRIA('2. Matriz Homologación ACM'!L{fila_inicio}:L{fila_fin})"
     ws3["B9"].number_format = "0.00"
     ws3["C9"] = "Mide la tendencia de sesgo de las ofertas"
 
