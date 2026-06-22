@@ -16,6 +16,7 @@ st.markdown("---")
 
 pipeline_db.inicializar_db()
 
+# Inicialización de todas las variables de sesión
 if "procesado" not in st.session_state:
     st.session_state.procesado = False
     st.session_state.muestras = []
@@ -28,6 +29,8 @@ if "procesado" not in st.session_state:
     st.session_state.lim_inf = 0.0
     st.session_state.aprobado = False
     st.session_state.datos_inmueble = {}
+    st.session_state.top5_muestras = []
+    st.session_state.calc_fitto = {}   # ← inicializado aquí
 
 st.markdown("### 🔍 Parámetros del Inmueble Objetivo")
 
@@ -90,11 +93,8 @@ st.markdown("---")
 
 # --- Función para calcular Fitto Corvini ---
 def fitto_corvini(area, edad, vida_util, conservacion, costo_m2):
-    # Coeficiente según tabla simplificada (edad/vida útil vs conservación)
-    # Clase: Buena=3, Regular=4, Mala=5
     clase = {"Buena": 3, "Regular": 4, "Mala": 5}.get(conservacion, 3)
     edad_pct = (edad / vida_util) * 100
-    # Tabla simplificada (ajustar según necesidad)
     if edad_pct <= 5:
         coef = 0.05
     elif edad_pct <= 10:
@@ -107,7 +107,7 @@ def fitto_corvini(area, edad, vida_util, conservacion, costo_m2):
         coef = 0.50 + (clase - 3) * 0.15
     else:
         coef = 0.70 + (clase - 3) * 0.20
-    coef = min(coef, 0.90)  # máximo depreciación 90%
+    coef = min(coef, 0.90)
     valor_depreciado_m2 = costo_m2 * (1 - coef)
     valor_total_construccion = valor_depreciado_m2 * area
     return {
@@ -186,7 +186,6 @@ def _escribir_hoja_avaluo(ws, datos, muestras, calc_fitto, es_completa, **styles
     fh_fill = styles['fill_header']; fz = styles['fill_zebra']; fa = styles['fill_accent']
     bdr = styles['thin_border']
 
-    # Encabezados
     ws["A2"] = "AVALUO CASA PRIMER PISO"
     ws["A2"].font = ft
     ws["A3"] = "No. Avalúo"
@@ -197,7 +196,6 @@ def _escribir_hoja_avaluo(ws, datos, muestras, calc_fitto, es_completa, **styles
     ws["A6"] = "M.I."
     ws["B6"] = datos.get("matricula","")
 
-    # Tabla de muestras
     ws["A8"] = "HOMOGENIZADO APARTAMENTOS EN LA ZONA"
     ws["A8"].font = ft
     headers = ["Ítem", "Tipo de Inmueble", "Dirección y/o Ubicación", "Valor Pedido", "Area de Terreno",
@@ -209,11 +207,9 @@ def _escribir_hoja_avaluo(ws, datos, muestras, calc_fitto, es_completa, **styles
 
     fila = 10
     for i, m in enumerate(muestras, 1):
-        # Calcular depreciación de construcción para esta muestra (simulado)
         area_terreno_m = m.get("area_terreno", 0)
         area_construida_m = m.get("area_construida", 0)
-        # Valor depreciado construcción (usamos el costo de reposición * área * coef ficticio)
-        valor_depreciado_const = calc_fitto["valor_depreciado_m2"] * area_construida_m if area_construida_m > 0 else 0
+        valor_depreciado_const = calc_fitto.get("valor_depreciado_m2", 0) * area_construida_m if area_construida_m > 0 else 0
         valor_comercial_terreno = m["precio_oferta"] - valor_depreciado_const
         valor_m2_depurado_terreno = valor_comercial_terreno / area_terreno_m if area_terreno_m > 0 else 0
 
@@ -226,12 +222,11 @@ def _escribir_hoja_avaluo(ws, datos, muestras, calc_fitto, es_completa, **styles
         ws.cell(row=fila, column=7, value=valor_depreciado_const).number_format = "#,##0"
         ws.cell(row=fila, column=8, value=valor_comercial_terreno).number_format = "#,##0"
         ws.cell(row=fila, column=9, value=valor_m2_depurado_terreno).number_format = "#,##0"
-        ws.cell(row=fila, column=10, value=valor_m2_depurado_terreno)  # Eliminación después
+        ws.cell(row=fila, column=10, value=valor_m2_depurado_terreno)
         for c in range(1, 11):
             ws.cell(row=fila, column=c).border = bdr
         fila += 1
 
-    # Estadísticas (sobre valores de columna J)
     n_muestras = len(muestras)
     if n_muestras > 0:
         ws.cell(row=fila, column=9, value="Promedio").font = fb
@@ -254,21 +249,20 @@ def _escribir_hoja_avaluo(ws, datos, muestras, calc_fitto, es_completa, **styles
         fila += 1
         ws.cell(row=fila, column=9, value="VALOR ADOPTADO").font = fb
         ws.cell(row=fila, column=10, value=f"={fila-6}").number_format = "#,##0"
-        fila_promedio = fila - 6  # fila del promedio
+        fila_promedio = fila - 6
 
-    # Liquidación
     fila += 2
     ws.cell(row=fila, column=1, value="IDENTIFICACIÓN DEL BIEN").font = fb
     ws.cell(row=fila, column=2, value="ÁREA"); ws.cell(row=fila, column=3, value="VALOR M2"); ws.cell(row=fila, column=4, value="VALOR TOTAL")
     fila += 1
     ws.cell(row=fila, column=1, value="LOTE DE TERRENO")
     ws.cell(row=fila, column=2, value=datos.get("area_terreno", 0))
-    ws.cell(row=fila, column=3, value=f"={fila_promedio+4}")  # referencia al valor adoptado
+    ws.cell(row=fila, column=3, value=f"={fila_promedio+4}")
     ws.cell(row=fila, column=4, value=f"=B{fila}*C{fila}").number_format = "#,##0"
     fila += 1
     ws.cell(row=fila, column=1, value="CONSTRUCCIÓN")
     ws.cell(row=fila, column=2, value=datos.get("area_construida", 0))
-    ws.cell(row=fila, column=3, value=calc_fitto["valor_depreciado_m2"]).number_format = "#,##0"
+    ws.cell(row=fila, column=3, value=calc_fitto.get("valor_depreciado_m2", 0)).number_format = "#,##0"
     ws.cell(row=fila, column=4, value=f"=B{fila}*C{fila}").number_format = "#,##0"
     fila += 1
     ws.cell(row=fila, column=1, value="VALOR TOTAL DEL INMUEBLE").font = fb
@@ -293,11 +287,11 @@ def _escribir_hoja_fitto(ws, datos, calc, **styles):
         ("Costo directo de construcción actual por unidad", f"${datos.get('costo_reposicion_m2',0):,.0f}", "Pesos por M2"),
         ("Vida técnica", 70, "años"),
         ("Depreciación Calificación", 3.5, "Clase"),
-        ("Coeficiente de depreciación", calc["coef"], ""),
-        ("Valor a depreciar", f"${datos.get('costo_reposicion_m2',0) - calc['valor_depreciado_m2']:,.0f}", "Pesos"),
-        ("Valor depreciado de la construcción M2", f"${calc['valor_depreciado_m2']:,.0f}", "Pesos"),
-        ("Valor M2 de la construcción", f"${calc['valor_depreciado_m2']:,.0f}", "Pesos por M2"),
-        ("VALOR TOTAL CONSTRUCCIÓN", f"${calc['valor_total_construccion']:,.0f}", "Pesos"),
+        ("Coeficiente de depreciación", calc.get("coef", 0), ""),
+        ("Valor a depreciar", f"${datos.get('costo_reposicion_m2',0) - calc.get('valor_depreciado_m2',0):,.0f}", "Pesos"),
+        ("Valor depreciado de la construcción M2", f"${calc.get('valor_depreciado_m2',0):,.0f}", "Pesos"),
+        ("Valor M2 de la construcción", f"${calc.get('valor_depreciado_m2',0):,.0f}", "Pesos por M2"),
+        ("VALOR TOTAL CONSTRUCCIÓN", f"${calc.get('valor_total_construccion',0):,.0f}", "Pesos"),
     ]
     for r, (desc, val, unit) in enumerate(data, 7):
         ws.cell(row=r, column=1, value=desc)
@@ -361,7 +355,10 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
     st.session_state.top5_muestras = top5
     
     # Cálculo Fitto Corvini para el inmueble objetivo
-    calc_fitto = fitto_corvini(area_construida, edad_const, 70, conservacion, costo_reposicion_m2)
+    if rph == "NO":
+        calc_fitto = fitto_corvini(area_construida, edad_const, 70, conservacion, costo_reposicion_m2)
+    else:
+        calc_fitto = {"coef": 0, "valor_depreciado_m2": 0, "valor_total_construccion": 0}
     st.session_state.calc_fitto = calc_fitto
     
     st.session_state.procesado = True
