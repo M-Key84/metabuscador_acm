@@ -73,7 +73,7 @@ with col_comp2:
     patio = st.number_input("Patio (m²)", min_value=0.0, value=0.0, step=0.5)
 terraza = st.number_input("Terraza (m²)", min_value=0.0, value=0.0, step=0.5)
 
-# Si no es RPH, mostramos también el área de terreno (para el método de mercado)
+# Si no es RPH, pedimos área de terreno (fundamental para el avalúo)
 if rph == "NO":
     area_terreno = st.number_input("Área de Terreno Lote (m²)", min_value=10.0, value=area_total, step=0.1)
 else:
@@ -84,11 +84,9 @@ st.markdown("---")
 def seleccionar_top5_por_area(muestras, area_ref, es_rph):
     """Ordena las muestras por cercanía de área (construida si RPH, terreno si no) y devuelve las 5 mejores."""
     col_area = "area_construida" if es_rph == "SÍ" else "area_terreno"
-    # Filtrar solo las que tienen el área relevante > 0
     validas = [m for m in muestras if m.get(col_area, 0) > 0]
     if not validas:
         return muestras[:5]
-    # Ordenar por diferencia absoluta con el área objetivo
     validas.sort(key=lambda x: abs(x[col_area] - area_ref))
     return validas[:5]
 
@@ -128,6 +126,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
+    # Lista de variables con Área de Terreno incluida (necesaria para liquidación)
     variables_mapeadas = [
         ("Propietario del Inmueble", datos_obj["propietario"]),
         ("Matrícula Inmobiliaria", datos_obj["matricula"]),
@@ -136,6 +135,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ("Tipo de Zona", datos_obj["tipo_zona"]),
         ("Sometido a RPH", datos_obj["rph"]),
         ("Área Construida", datos_obj["area_construida"]),
+        ("Área de Terreno", datos_obj.get("area_terreno", 0)),   # <-- nuevo campo
         ("Área Libre", datos_obj.get("area_libre", 0)),
         ("Área Total", datos_obj.get("area_total", 0)),
         ("Piso", datos_obj.get("piso", "")),
@@ -151,7 +151,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ws1.cell(row=i, column=1).border = thin_border
         c_val.border = thin_border
 
-    # ========== PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN (solo 5 muestras) ==========
+    # ========== PESTAÑA 2: MATRIZ DE HOMOLOGACIÓN (5 muestras) ==========
     ws2 = wb.create_sheet(title="Homologacion")
     ws2.views.sheetView[0].showGridLines = True
     ws2["A2"] = "MATRIZ DE HOMOLOGACIÓN Y AJUSTE DE MUESTRAS EN VIVO"
@@ -179,13 +179,14 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         
         ws2.cell(row=f, column=1, value=f"Muestra {idx+1}").alignment = Alignment(horizontal="center")
         ws2.cell(row=f, column=2, value=m["portal"])
-        # Hipervínculo
+        # Hipervínculo funcional
         link_cell = ws2.cell(row=f, column=3, value="Ver oferta")
         link_cell.hyperlink = m.get("link", "#")
         link_cell.font = Font(name="Arial", size=10, color="0563C1", underline="single")
         
         ws2.cell(row=f, column=4, value=m["precio_oferta"]).number_format = "#,##0"
         ws2.cell(row=f, column=5, value=m.get("fn", 0.95)).number_format = "0.00"
+        # Fórmulas en inglés
         ws2.cell(row=f, column=6, value=f"=D{f}*E{f}").number_format = "#,##0"
         area_val = m["area_construida"] if datos_obj["rph"] == "SÍ" else m["area_terreno"]
         ws2.cell(row=f, column=7, value=area_val).number_format = "#,##0.00"
@@ -207,10 +208,10 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     fila_prom = fila_fin + 2
     
     ws2.cell(row=fila_prom, column=1, value="PROMEDIO").font = font_bold
-    ws2.cell(row=fila_prom, column=13, value=f"=PROMEDIO(M{fila_inicio}:M{fila_fin})").font = font_bold
+    ws2.cell(row=fila_prom, column=13, value=f"=AVERAGE(M{fila_inicio}:M{fila_fin})").font = font_bold
     ws2.cell(row=fila_prom, column=13).number_format = "#,##0"
 
-    # ========== PESTAÑA 3: ANÁLISIS ESTADÍSTICO (límites al 15%) ==========
+    # ========== PESTAÑA 3: ANÁLISIS ESTADÍSTICO (15%) ==========
     ws3 = wb.create_sheet(title="3. Análisis Estadístico IGAC")
     ws3.views.sheetView[0].showGridLines = True
     ws3["A2"] = "CÁLCULOS ESTADÍSTICOS Y CÁLCULO DE VALOR COMERCIAL"
@@ -228,10 +229,10 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    # Constantes en celdas ocultas (15% ahora)
-    ws3["D10"] = 1.15   # factor para límite superior (antes 1.075)
+    # Constantes en celdas ocultas (15%)
+    ws3["D10"] = 1.15
     ws3["D10"].number_format = "0.000"
-    ws3["D11"] = 0.85   # factor para límite inferior (antes 0.925)
+    ws3["D11"] = 0.85
     ws3["D11"].number_format = "0.000"
 
     ws3["A6"] = "Promedio del Valor M² Homogenizado"
@@ -241,7 +242,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C6"] = "Base para la liquidación del metro cuadrado"
     
     ws3["A7"] = "Desviación Estándar de la Muestra (σ)"
-    ws3["B7"] = f"=DESVEST.M(Homologacion!M{fila_inicio}:M{fila_fin})"
+    ws3["B7"] = f"=STDEV.S(Homologacion!M{fila_inicio}:M{fila_fin})"
     ws3["B7"].number_format = "#,##0"
     ws3["C7"] = "Mide el grado de dispersión de los precios de los portales"
     
@@ -252,7 +253,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C8"] = "CRITERIO DE ALTA PRECISIÓN: Debe ser menor o igual al 15.00%"
     
     ws3["A9"] = "Coeficiente de Asimetría"
-    ws3["B9"] = f"=COEFICIENTE.ASIMETRIA(Homologacion!M{fila_inicio}:M{fila_fin})"
+    ws3["B9"] = f"=SKEW(Homologacion!M{fila_inicio}:M{fila_fin})"
     ws3["B9"].number_format = "0.00"
     ws3["C9"] = "Mide la tendencia de sesgo de las ofertas"
 
@@ -268,7 +269,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["A13"].font = font_bold
     
     ws3["A15"] = "Área del Inmueble Objetivo a Liquidar"
-    ws3["B15"] = "='1. Ficha Inmueble Objetivo'!B11" if datos_obj["rph"] == "SÍ" else "='1. Ficha Inmueble Objetivo'!B12"
+    # Área Construida está en B12, Área de Terreno en B13
+    ws3["B15"] = "='1. Ficha Inmueble Objetivo'!B12" if datos_obj["rph"] == "SÍ" else "='1. Ficha Inmueble Objetivo'!B13"
     ws3["B15"].number_format = "#,##0.00"
     ws3["C15"] = "Metros cuadrados tomados del informe físico"
     
@@ -307,7 +309,6 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
 
 # --- Botón de procesamiento ---
 if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_container_width=True):
-    # Guardar todos los datos del inmueble
     st.session_state.datos_inmueble = {
         "propietario": propietario,
         "matricula": matricula,
@@ -325,11 +326,9 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
         "area_terreno": area_terreno
     }
     
-    # Área de referencia para la búsqueda
     area_referencia = area_construida if rph == "SÍ" else area_terreno
     st.session_state.muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
     
-    # Si no hay muestras en la BD, se extraen (reales o simuladas)
     if len(st.session_state.muestras) == 0:
         extractor = ExtractorInmobiliario()
         es_rural = (tipo_zona == "Rural")
@@ -337,18 +336,14 @@ if st.button("🚀 Consultar Metabuscador y Procesar Homologación", use_contain
         pipeline_db.guardar_muestras_upsert(muestras_internet)
         st.session_state.muestras = pipeline_db.consultar_muestras_validas(municipio, barrio, area_referencia, rph)
 
-    # Calcular estadísticas con todas las muestras (8) para el tablero
     motor = MotorACM()
     st.session_state.valores_m2 = motor.procesar_homogenizacion(st.session_state.muestras, rph)
     st.session_state.media, st.session_state.desv, st.session_state.cv, st.session_state.asimetria, st.session_state.lim_sup, st.session_state.lim_inf, st.session_state.aprobado = motor.analizar_estadistica_igac(st.session_state.valores_m2)
     
-    # Para el Excel: seleccionar las 5 mejores por cercanía de área
     top5 = seleccionar_top5_por_area(st.session_state.muestras, area_referencia, rph)
     st.session_state.top5_muestras = top5
-    
     st.session_state.procesado = True
 
-# --- Mostrar resultados ---
 if st.session_state.procesado:
     st.markdown("---")
     st.markdown("### 📊 Tablero Analítico Control 15% Pro")
