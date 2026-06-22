@@ -126,7 +126,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         cell.fill = fill_header
         cell.alignment = Alignment(horizontal="center")
 
-    # Lista de variables con Área de Terreno incluida (necesaria para liquidación)
+    # Incluye el Área de Terreno para la liquidación
     variables_mapeadas = [
         ("Propietario del Inmueble", datos_obj["propietario"]),
         ("Matrícula Inmobiliaria", datos_obj["matricula"]),
@@ -135,7 +135,7 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         ("Tipo de Zona", datos_obj["tipo_zona"]),
         ("Sometido a RPH", datos_obj["rph"]),
         ("Área Construida", datos_obj["area_construida"]),
-        ("Área de Terreno", datos_obj.get("area_terreno", 0)),   # <-- nuevo campo
+        ("Área de Terreno", datos_obj.get("area_terreno", 0)),
         ("Área Libre", datos_obj.get("area_libre", 0)),
         ("Área Total", datos_obj.get("area_total", 0)),
         ("Piso", datos_obj.get("piso", "")),
@@ -179,14 +179,17 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
         
         ws2.cell(row=f, column=1, value=f"Muestra {idx+1}").alignment = Alignment(horizontal="center")
         ws2.cell(row=f, column=2, value=m["portal"])
-        # Hipervínculo funcional
+        # Hipervínculo – se muestra "Ver oferta" y al hacer clic abre el enlace
+        link_url = m.get("link", "#")
+        if not link_url.startswith("http"):
+            link_url = "https://" + link_url   # asegurar protocolo
         link_cell = ws2.cell(row=f, column=3, value="Ver oferta")
-        link_cell.hyperlink = m.get("link", "#")
+        link_cell.hyperlink = link_url
         link_cell.font = Font(name="Arial", size=10, color="0563C1", underline="single")
         
         ws2.cell(row=f, column=4, value=m["precio_oferta"]).number_format = "#,##0"
         ws2.cell(row=f, column=5, value=m.get("fn", 0.95)).number_format = "0.00"
-        # Fórmulas en inglés
+        # Fórmulas en inglés (compatibles universalmente)
         ws2.cell(row=f, column=6, value=f"=D{f}*E{f}").number_format = "#,##0"
         area_val = m["area_construida"] if datos_obj["rph"] == "SÍ" else m["area_terreno"]
         ws2.cell(row=f, column=7, value=area_val).number_format = "#,##0.00"
@@ -242,7 +245,8 @@ def fabricar_excel_con_formulas_vivas(datos_obj, muestras):
     ws3["C6"] = "Base para la liquidación del metro cuadrado"
     
     ws3["A7"] = "Desviación Estándar de la Muestra (σ)"
-    ws3["B7"] = f"=STDEV.S(Homologacion!M{fila_inicio}:M{fila_fin})"
+    # Se usa STDEV sin punto, compatible con todas las versiones
+    ws3["B7"] = f"=STDEV(Homologacion!M{fila_inicio}:M{fila_fin})"
     ws3["B7"].number_format = "#,##0"
     ws3["C7"] = "Mide el grado de dispersión de los precios de los portales"
     
