@@ -3,6 +3,7 @@ import time
 import random
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import quote
 
 class ExtractorInmobiliario:
     def __init__(self):
@@ -26,13 +27,35 @@ class ExtractorInmobiliario:
         return float(numeros[0]) if numeros else 0.0
 
     def _generar_links_busqueda(self, municipio, barrio, es_rph, es_rural=False):
+        """
+        Crea URLs limpias y codificadas para los principales portales.
+        """
+        # Determinar tipo de inmueble
         if es_rural:
-            tipo = "finca"  # para rural se busca finca o lote
+            tipo = "finca"
         else:
             tipo = "apartamento" if es_rph == "SÍ" else "casa"
-        mun_slug = municipio.lower().replace(' ', '-')
-        bar_slug = barrio.lower().replace(' ', '-').replace('(', '').replace(')', '').replace('°', '')
-        return [
+
+        # Preparar slugs – convertimos a minúsculas, quitamos paréntesis y el símbolo °,
+        # luego reemplazamos espacios y caracteres especiales por guiones,
+        # y finalmente codificamos para URL.
+        def slug(texto):
+            # Reemplazar caracteres problemáticos
+            limpio = texto.lower().strip()
+            limpio = limpio.replace('(', '').replace(')', '').replace('°', '')
+            # Reemplazar espacios y guiones bajos por guiones
+            limpio = re.sub(r'[\s_]+', '-', limpio)
+            # Eliminar cualquier otro carácter no alfanumérico excepto guiones
+            limpio = re.sub(r'[^\w\-]', '', limpio)
+            # Codificar para URL
+            return quote(limpio)
+
+        mun_slug = slug(municipio)
+        bar_slug = slug(barrio)
+
+        # Plantillas de URL (algunas pueden no funcionar si el portal cambia su estructura,
+        # pero son las búsquedas públicas más comunes)
+        portales_urls = [
             ("Finca Raíz", f"https://www.fincaraiz.com.co/{tipo}/venta/{mun_slug}/{bar_slug}/"),
             ("Metro Cuadrado", f"https://www.metrocuadrado.com/{tipo}/venta/{mun_slug}/{bar_slug}/"),
             ("Cien Cuadras", f"https://www.ciencuadras.com/{tipo}/venta/{mun_slug}/{bar_slug}/"),
@@ -40,10 +63,10 @@ class ExtractorInmobiliario:
             ("Mercado Libre", f"https://casa.mercadolibre.com.co/venta-de-{tipo}s/{mun_slug}/{bar_slug}/"),
             ("Mitula", f"https://casas.mitula.com.co/venta/{mun_slug}/{bar_slug}/")
         ]
+        return portales_urls
 
-    # Métodos de scraping real (se dejan igual; solo se invocan si se quiere intentar)
+    # Métodos de scraping real (se mantienen vacíos porque usamos el simulador)
     def _scrape_metro_cuadrado(self, municipio, barrio, es_rph, max_samples=3):
-        # ... (sin cambios)
         pass
     def _scrape_finca_raiz(self, municipio, barrio, es_rph, max_samples=3):
         pass
@@ -57,13 +80,12 @@ class ExtractorInmobiliario:
         m_nom = municipio.upper().strip()
         b_nom = barrio.upper().strip()
 
+        # Precios base según zona
         if es_rural:
-            # Precios base para zona rural (más bajos, áreas grandes)
             base_m2 = 500000 + random.uniform(-50000, 50000)
             lim_inf = area_referencia * 0.5
             lim_sup = area_referencia * 1.5
         else:
-            # Lógica urbana anterior
             if "POBLADO" in b_nom or "CONQUISTADORES" in b_nom or "AVES MARÍA" in b_nom:
                 base_m2 = 6800000
             elif "LAURELES" in b_nom or "BELÉN" in b_nom or "SABANETA" in m_nom or "ENVIGADO" in m_nom:
@@ -88,9 +110,8 @@ class ExtractorInmobiliario:
             portal, link = links_disponibles[i % len(links_disponibles)]
 
             if es_rural:
-                # Para rural, el área de interés es el terreno
                 area_t = round(random.uniform(lim_inf, lim_sup), 2)
-                area_c = round(area_t * random.uniform(0.05, 0.15), 2)  # poca construcción
+                area_c = round(area_t * random.uniform(0.05, 0.15), 2)
                 precio_oferta = int(precio_m2_muestra * area_t)
             else:
                 if es_rph == "SÍ":
@@ -125,8 +146,7 @@ class ExtractorInmobiliario:
         Intenta scraping real; si falla, completa con simulación (ya incluye el parámetro rural).
         """
         muestras = []
-        # Intentar los portales (por simplicidad, solo simulación por ahora)
-        # muestras += self._scrape_metro_cuadrado(...) etc.
+        # Aquí irían los intentos reales, pero por simplicidad usamos solo simulación por ahora
         if len(muestras) < 4:
             faltan = 6 - len(muestras)
             simuladas = self.raspar_portal_simulado(municipio, barrio, es_rph, area_referencia, es_rural)[:faltan]
