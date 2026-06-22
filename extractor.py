@@ -28,44 +28,40 @@ class ExtractorInmobiliario:
 
     def _generar_links_busqueda(self, municipio, barrio, es_rph, es_rural=False):
         """
-        Crea URLs limpias y codificadas para los principales portales.
+        Genera enlaces de búsqueda que incluyen el barrio/vereda y el municipio,
+        utilizando los buscadores de cada portal.
         """
-        # Determinar tipo de inmueble
+        # Tipo de inmueble
         if es_rural:
             tipo = "finca"
         else:
             tipo = "apartamento" if es_rph == "SÍ" else "casa"
 
-        # Preparar slugs – convertimos a minúsculas, quitamos paréntesis y el símbolo °,
-        # luego reemplazamos espacios y caracteres especiales por guiones,
-        # y finalmente codificamos para URL.
-        def slug(texto):
-            # Reemplazar caracteres problemáticos
-            limpio = texto.lower().strip()
-            limpio = limpio.replace('(', '').replace(')', '').replace('°', '')
-            # Reemplazar espacios y guiones bajos por guiones
-            limpio = re.sub(r'[\s_]+', '-', limpio)
-            # Eliminar cualquier otro carácter no alfanumérico excepto guiones
-            limpio = re.sub(r'[^\w\-]', '', limpio)
-            # Codificar para URL
-            return quote(limpio)
+        # Limpiar el texto para el parámetro de búsqueda
+        def limpiar(texto):
+            t = texto.strip()
+            # eliminar paréntesis, °, etc.
+            t = t.replace('(', '').replace(')', '').replace('°', '')
+            return t
 
-        mun_slug = slug(municipio)
-        bar_slug = slug(barrio)
+        barrio_limpio = limpiar(barrio)
+        municipio_limpio = limpiar(municipio)
 
-        # Plantillas de URL (algunas pueden no funcionar si el portal cambia su estructura,
-        # pero son las búsquedas públicas más comunes)
+        # Término de búsqueda combinado
+        q = quote(f"{barrio_limpio} {municipio_limpio}")
+
+        # Enlaces a los portales con el barrio+municipio como búsqueda
         portales_urls = [
-            ("Finca Raíz", f"https://www.fincaraiz.com.co/{tipo}/venta/{mun_slug}/{bar_slug}/"),
-            ("Metro Cuadrado", f"https://www.metrocuadrado.com/{tipo}/venta/{mun_slug}/{bar_slug}/"),
-            ("Cien Cuadras", f"https://www.ciencuadras.com/{tipo}/venta/{mun_slug}/{bar_slug}/"),
-            ("Properati", f"https://www.properati.com.co/{tipo}/venta/{mun_slug}/{bar_slug}/"),
-            ("Mercado Libre", f"https://casa.mercadolibre.com.co/venta-de-{tipo}s/{mun_slug}/{bar_slug}/"),
-            ("Mitula", f"https://casas.mitula.com.co/venta/{mun_slug}/{bar_slug}/")
+            ("Finca Raíz", f"https://www.fincaraiz.com.co/buscar?q={q}"),
+            ("Metro Cuadrado", f"https://www.metrocuadrado.com/buscar?q={q}"),
+            ("Cien Cuadras", f"https://www.ciencuadras.com/busqueda?q={q}"),
+            ("Properati", f"https://www.properati.com.co/buscar?q={q}"),
+            ("Mercado Libre", f"https://listado.mercadolibre.com.co/{q}"),
+            ("Mitula", f"https://casas.mitula.com.co/venta/{municipio_limpio}/{barrio_limpio}/")
         ]
         return portales_urls
 
-    # Métodos de scraping real (se mantienen vacíos porque usamos el simulador)
+    # Métodos de scraping real (sin implementar)
     def _scrape_metro_cuadrado(self, municipio, barrio, es_rph, max_samples=3):
         pass
     def _scrape_finca_raiz(self, municipio, barrio, es_rph, max_samples=3):
@@ -80,7 +76,6 @@ class ExtractorInmobiliario:
         m_nom = municipio.upper().strip()
         b_nom = barrio.upper().strip()
 
-        # Precios base según zona
         if es_rural:
             base_m2 = 500000 + random.uniform(-50000, 50000)
             lim_inf = area_referencia * 0.5
@@ -142,11 +137,7 @@ class ExtractorInmobiliario:
         return muestras_limpias
 
     def raspar_portal_real(self, municipio, barrio, es_rph, area_referencia, es_rural=False):
-        """
-        Intenta scraping real; si falla, completa con simulación (ya incluye el parámetro rural).
-        """
         muestras = []
-        # Aquí irían los intentos reales, pero por simplicidad usamos solo simulación por ahora
         if len(muestras) < 4:
             faltan = 6 - len(muestras)
             simuladas = self.raspar_portal_simulado(municipio, barrio, es_rph, area_referencia, es_rural)[:faltan]
